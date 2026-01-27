@@ -74,7 +74,7 @@ kiromon -c say -me "{time} タスク完了。{duration}かかりました" kiro-
 監視対象コマンドが `-` で始まるオプションを持つ場合は `--` で区切ります：
 
 ```bash
-kiromon -c notify-send -m "開始" "完了" -- some-cmd --verbose --debug
+kiromon -c notify-send -ms "開始" -me "完了" -- some-cmd --verbose --debug
 ```
 
 #### 動作
@@ -129,7 +129,7 @@ kiromon -s kiro-cli -d -c notify-send -me "タスク完了"
 kiromon -s kiro-cli -d -i 5
 
 # カスタムプロンプトパターン
-kiromon -s kiro-cli -d -r '> ?$' -m "開始" "完了" kiro-cli chat
+kiromon -s kiro-cli -d -r '> ?$' -me "完了" -c notify-send
 ```
 
 ### 監視中プロセス一覧
