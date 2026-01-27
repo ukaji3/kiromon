@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -50,6 +51,7 @@ var (
 	currentLine    string
 	currentLineMu  sync.RWMutex
 	promptPatterns []*regexp.Regexp
+	processStartTime time.Time
 )
 
 func main() {
@@ -69,25 +71,7 @@ func main() {
 	}
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage:")
-		fmt.Fprintln(os.Stderr, "  kiromon <command> [args...]       - Run command with monitoring")
-		fmt.Fprintln(os.Stderr, "  kiromon -s <name>                 - Show status of all instances")
-		fmt.Fprintln(os.Stderr, "  kiromon -s <name> -p <pid>        - Show status of specific PID")
-		fmt.Fprintln(os.Stderr, "  kiromon -p <pid>                  - Show status by PID only")
-		fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d              - Daemon mode (monitor all instances)")
-		fmt.Fprintln(os.Stderr, "  kiromon -p <pid> -d               - Daemon mode (monitor specific PID)")
-		fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -i <sec>     - Set polling interval (default: 2s)")
-		fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -c <cmd>     - Run command on state change")
-		fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -c <cmd> -m <start> <end>  - Custom messages")
-		fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -r <regex>   - Custom prompt pattern for waiting state")
-		fmt.Fprintln(os.Stderr, "  kiromon -l                        - List all monitored processes")
-		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, "Examples:")
-		fmt.Fprintln(os.Stderr, "  kiromon kiro-cli chat")
-		fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -c notify-send")
-		fmt.Fprintln(os.Stderr, "  kiromon -p 12345 -d -c notify-send")
-		fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -c voicevox-speak -m \"開始\" \"完了\"")
-		fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -r '> ?$'  # Custom prompt pattern")
+		printUsage()
 		os.Exit(1)
 	}
 
@@ -96,8 +80,40 @@ func main() {
 		return
 	}
 
+	// Check for standalone mode (-c option before command)
+	if os.Args[1] == "-c" {
+		runStandalone()
+		return
+	}
+
 	// Parse -p option is removed, just run wrapper
-	runWrapper(os.Args[1:])
+	runWrapper(os.Args[1:], nil)
+}
+
+func printUsage() {
+	fmt.Fprintln(os.Stderr, "Usage:")
+	fmt.Fprintln(os.Stderr, "  kiromon <command> [args...]       - Run command with monitoring")
+	fmt.Fprintln(os.Stderr, "  kiromon -s <name>                 - Show status of all instances")
+	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -p <pid>        - Show status of specific PID")
+	fmt.Fprintln(os.Stderr, "  kiromon -p <pid>                  - Show status by PID only")
+	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d              - Daemon mode (monitor all instances)")
+	fmt.Fprintln(os.Stderr, "  kiromon -p <pid> -d               - Daemon mode (monitor specific PID)")
+	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -i <sec>     - Set polling interval (default: 2s)")
+	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -c <cmd>     - Run command on state change")
+	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -c <cmd> -m <start> <end>  - Custom messages")
+	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -r <regex>   - Custom prompt pattern for waiting state")
+	fmt.Fprintln(os.Stderr, "  kiromon -l                        - List all monitored processes")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Standalone mode (run + monitor in one process):")
+	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-m <start> <end>] [-r <regex>] [--] <command> [args...]")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Examples:")
+	fmt.Fprintln(os.Stderr, "  kiromon kiro-cli chat")
+	fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -c notify-send")
+	fmt.Fprintln(os.Stderr, "  kiromon -p 12345 -d -c notify-send")
+	fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -c voicevox-speak -m \"開始\" \"完了\"")
+	fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -r '> ?$'  # Custom prompt pattern")
+	fmt.Fprintln(os.Stderr, "  kiromon -c voicevox-speak -m \"開始\" \"完了\" kiro-cli chat -a  # Standalone")
 }
 
 func getStatusDir() string {
@@ -160,10 +176,6 @@ func cleanupStaleFiles() {
 	}
 }
 
-func getStatusFile(name string) string {
-	return filepath.Join(getStatusDir(), name+".json")
-}
-
 // getStatusFileWithPID returns status file path with PID for unique identification
 func getStatusFileWithPID(name string, pid int) string {
 	return filepath.Join(getStatusDir(), fmt.Sprintf("%s-%d.json", name, pid))
@@ -201,7 +213,8 @@ func readStatusWithLock(filename string) (*Status, error) {
 	}
 	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 	
-	data, err := os.ReadFile(filename)
+	// Read from the locked file descriptor
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +227,115 @@ func readStatusWithLock(filename string) (*Status, error) {
 	return &status, nil
 }
 
-func runWrapper(args []string) {
+// StandaloneConfig holds configuration for standalone mode
+type StandaloneConfig struct {
+	Command       string
+	StartMsg      string
+	EndMsg        string
+	PromptPattern *regexp.Regexp
+	LogFile       *os.File
+	logMu         sync.Mutex
+}
+
+func runStandalone() {
+	command := ""
+	startMsg := "タスクを開始しました。"
+	endMsg := "タスクを終了しました。"
+	promptPattern := ""
+	var cmdArgs []string
+
+	// First, get the command after -c (os.Args[1] is "-c")
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "Error: -c requires a command")
+		os.Exit(1)
+	}
+	command = os.Args[2]
+
+	// Parse remaining options
+	args := os.Args[3:]
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--":
+			// Everything after -- is the command to run
+			if i+1 < len(args) {
+				cmdArgs = args[i+1:]
+			}
+			i = len(args) // break out of loop
+		case "-m":
+			if i+2 < len(args) {
+				i++
+				startMsg = args[i]
+				i++
+				endMsg = args[i]
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -m requires two messages")
+				os.Exit(1)
+			}
+		case "-r":
+			if i+1 < len(args) {
+				i++
+				promptPattern = args[i]
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -r requires a regex pattern")
+				os.Exit(1)
+			}
+		default:
+			// First non-option is the command to run
+			if !strings.HasPrefix(args[i], "-") {
+				cmdArgs = args[i:]
+				i = len(args) // break out of loop
+			}
+		}
+	}
+
+	if command == "" {
+		fmt.Fprintln(os.Stderr, "Error: -c <command> is required for standalone mode")
+		os.Exit(1)
+	}
+
+	if len(cmdArgs) == 0 {
+		fmt.Fprintln(os.Stderr, "Error: no command specified to run")
+		os.Exit(1)
+	}
+
+	// Open log file
+	logFile, err := os.OpenFile("kiromon.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not open kiromon.log: %v\n", err)
+	}
+
+	var promptRe *regexp.Regexp
+	if promptPattern != "" {
+		var err error
+		promptRe, err = regexp.Compile(promptPattern)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Invalid regex pattern: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	config := &StandaloneConfig{
+		Command:       command,
+		StartMsg:      startMsg,
+		EndMsg:        endMsg,
+		PromptPattern: promptRe,
+		LogFile:       logFile,
+	}
+
+	runWrapper(cmdArgs, config)
+}
+
+func logToFile(config *StandaloneConfig, format string, args ...interface{}) {
+	if config == nil || config.LogFile == nil {
+		return
+	}
+	config.logMu.Lock()
+	defer config.logMu.Unlock()
+	msg := fmt.Sprintf("[%s] %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, args...))
+	config.LogFile.WriteString(msg)
+}
+
+func runWrapper(args []string, standalone *StandaloneConfig) {
 	// Determine process name from command
 	name := filepath.Base(args[0])
 
@@ -261,6 +382,7 @@ func runWrapper(args []string) {
 
 	// Initialize status
 	lastActivity = time.Now()
+	processStartTime = time.Now()
 	updateStatus(StateRunning, strings.Join(args, " "), cmd.Process.Pid, "", false)
 
 	// Handle signals
@@ -334,6 +456,11 @@ func runWrapper(args []string) {
 	}()
 
 	// Status updater
+	var lastState string
+	var lastNotifiedState string
+	var stateChangeTime time.Time
+	const debounceDelay = 1 * time.Second // Wait 1 second before notifying
+	
 	go func() {
 		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
@@ -345,10 +472,21 @@ func runWrapper(args []string) {
 
 			// Check if current line matches prompt pattern
 			promptMatched := false
-			for _, re := range promptPatterns {
-				if re.MatchString(line) {
+			
+			// Check custom pattern first (for standalone mode)
+			if standalone != nil && standalone.PromptPattern != nil {
+				if standalone.PromptPattern.MatchString(line) {
 					promptMatched = true
-					break
+				}
+			}
+			
+			// Check default patterns
+			if !promptMatched {
+				for _, re := range promptPatterns {
+					if re.MatchString(line) {
+						promptMatched = true
+						break
+					}
 				}
 			}
 			// Also check if line ends with "> " or ">"
@@ -361,6 +499,60 @@ func runWrapper(args []string) {
 				state = StateWaiting
 			}
 			updateStatus(state, strings.Join(args, " "), cmd.Process.Pid, line, promptMatched)
+			
+			// Standalone mode: check for state changes and notify with debounce
+			if standalone != nil {
+				// Initialize lastState on first iteration
+				if lastState == "" {
+					lastState = state
+					lastNotifiedState = state
+					stateChangeTime = time.Now()
+					stateIcon := "🔄"
+					if state == StateWaiting {
+						stateIcon = "⏳"
+					}
+					logToFile(standalone, "PID %d: %s %s (initial)", cmd.Process.Pid, stateIcon, state)
+				} else if lastState != state {
+					// State changed, reset debounce timer
+					lastState = state
+					stateChangeTime = time.Now()
+				} else if lastState == state && lastNotifiedState != state {
+					// State is stable, check if debounce delay has passed
+					if time.Since(stateChangeTime) >= debounceDelay {
+						var message string
+						if state == StateWaiting {
+							message = standalone.EndMsg
+						} else if state == StateRunning {
+							message = standalone.StartMsg
+						}
+						
+						stateIcon := "🔄"
+						if state == StateWaiting {
+							stateIcon = "⏳"
+						}
+						logToFile(standalone, "PID %d: %s %s", cmd.Process.Pid, stateIcon, state)
+						
+						if message != "" {
+							logToFile(standalone, "%s", message)
+							
+							if standalone.Command != "" {
+								go func(msg string, config *StandaloneConfig) {
+									notifyCmd := exec.Command(config.Command, msg)
+									output, err := notifyCmd.CombinedOutput()
+									if err != nil {
+										logToFile(config, "Command error: %v", err)
+									}
+									if len(output) > 0 {
+										logToFile(config, "Command output: %s", strings.TrimSpace(string(output)))
+									}
+								}(message, standalone)
+							}
+						}
+						
+						lastNotifiedState = state
+					}
+				}
+			}
 		}
 	}()
 
@@ -370,6 +562,12 @@ func runWrapper(args []string) {
 
 	// Cleanup: remove status file on exit
 	os.Remove(statusFile)
+	
+	// Close log file if standalone mode
+	if standalone != nil && standalone.LogFile != nil {
+		logToFile(standalone, "Process terminated")
+		standalone.LogFile.Close()
+	}
 
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -428,7 +626,7 @@ func updateStatus(state, command string, pid int, lastLine string, promptMatched
 		State:         state,
 		Command:       command,
 		PID:           pid,
-		StartTime:     time.Now(),
+		StartTime:     processStartTime,
 		UpdatedAt:     time.Now(),
 		LastLines:     lines,
 		LastLine:      lastLine,
@@ -670,14 +868,6 @@ func showSingleStatus(name string, pid int) {
 		return
 	}
 
-	// Try exact match first (legacy format)
-	statusFile := getStatusFile(name)
-	status, err := readStatusWithLock(statusFile)
-	if err == nil {
-		printStatus(name, status)
-		return
-	}
-	
 	// Try to find files matching name-*.json pattern
 	dir := getStatusDir()
 	entries, err := os.ReadDir(dir)
@@ -884,13 +1074,6 @@ func checkAndNotify(status *Status, customPromptRe *regexp.Regexp, lastStates ma
 
 		lastStates[status.PID] = currentState
 	}
-}
-
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
 }
 
 func listProcesses() {
