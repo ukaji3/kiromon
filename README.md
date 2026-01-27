@@ -40,10 +40,10 @@ go build -o kiromon .
 kiromon -c notify-send -me "タスク完了" kiro-cli chat
 
 # 読み上げソフトと連動（開始・終了両方）
-kiromon -c voicevox-speak-standalone -ms "タスクを開始したのだ" -me "タスクを終了したのだ" kiro-cli chat
+kiromon -c voicevox-speak-standalone -ms "{time}、タスクを開始したのだ" -me "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。" kiro-cli chat -a -r
 
-# macOSのsayコマンドで読み上げ
-kiromon -c say -ms "タスクを開始したのだ" -me "タスクを終了したのだ" kiro-cli chat -a
+# macOSのsayコマンドで読み上げ（開始・終了両方）
+kiromon -c say -ms "{time}、タスクを開始したのだ" -me "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。" kiro-cli chat -a -r
 
 # カスタムプロンプトパターン
 kiromon -c notify-send -me "完了" -r '> ?$'
