@@ -31,17 +31,17 @@ go build -o kiromon .
 コマンドの実行と監視を1プロセスで行います。状態変化時に通知コマンドを実行できます。
 
 ```bash
-# notify-sendで通知
-kiromon -c notify-send kiro-cli chat
+# notify-sendで通知（終了時のみ）
+kiromon -c notify-send -me "タスク完了" kiro-cli chat
 
-# 読み上げソフトと連動 例1
-kiromon -c voicevox-speak-standalone -m "タスクを開始したのだ" "タスクを終了したのだ" kiro-cli chat -a
+# 読み上げソフトと連動（開始・終了両方）
+kiromon -c voicevox-speak-standalone -ms "タスクを開始したのだ" -me "タスクを終了したのだ" kiro-cli chat
 
-# 読み上げソフトと連動 例2
-kiromon -c say -m "タスクを開始したのだ" "タスクを終了したのだ" kiro-cli chat -a
+# macOSのsayコマンドで読み上げ
+kiromon -c say -ms "タスクを開始したのだ" -me "タスクを終了したのだ" kiro-cli chat -a
 
 # カスタムプロンプトパターン
-kiromon -c notify-send -r '> ?$'
+kiromon -c notify-send -me "完了" -r '> ?$'
 ```
 
 #### オプション
@@ -49,9 +49,27 @@ kiromon -c notify-send -r '> ?$'
 | オプション | 説明 |
 |-----------|------|
 | `-c <cmd>` | 状態変化時に実行するコマンド（必須） |
-| `-m <start> <end>` | カスタムメッセージ（デフォルト: 「タスクを開始しました。」「タスクを終了しました。」） |
+| `-ms <msg>` | 開始時（running状態）のメッセージ。省略時は開始時の通知なし |
+| `-me <msg>` | 終了時（waiting状態）のメッセージ。省略時は終了時の通知なし |
 | `-r <regex>` | カスタムプロンプトパターン（デフォルト: `> ?$`） |
 | `--` | これ以降を監視対象コマンドとして扱う（オプションの区切り） |
+
+#### プレースホルダ
+
+メッセージ内で以下のプレースホルダが使用できます：
+
+| プレースホルダ | 説明 |
+|---------------|------|
+| `{time}` | 現在時刻（xx時xx分xx秒形式、0の部分は省略） |
+| `{duration}` | タスク処理時間（xx時間xx分xx秒形式、0の部分は省略） |
+
+```bash
+# 処理時間を通知
+kiromon -c notify-send -me "タスク完了 処理時間: {duration}" kiro-cli chat
+
+# 時刻と処理時間を両方表示
+kiromon -c say -me "{time} タスク完了。{duration}かかりました" kiro-cli chat
+```
 
 監視対象コマンドが `-` で始まるオプションを持つ場合は `--` で区切ります：
 
@@ -102,7 +120,10 @@ kiromon -s kiro-cli -d -c notify-send
 kiromon -s kiro-cli -d -p 12345 -c notify-send
 
 # カスタムメッセージ
-kiromon -s kiro-cli -d -c notify-send -m "タスク開始" "タスク完了"
+kiromon -s kiro-cli -d -c notify-send -ms "タスク開始" -me "タスク完了"
+
+# 終了時のみ通知
+kiromon -s kiro-cli -d -c notify-send -me "タスク完了"
 
 # ポーリング間隔を変更（デフォルト: 2秒）
 kiromon -s kiro-cli -d -i 5

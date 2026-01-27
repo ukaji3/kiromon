@@ -100,20 +100,30 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  kiromon -p <pid> -d               - Daemon mode (monitor specific PID)")
 	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -i <sec>     - Set polling interval (default: 2s)")
 	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -c <cmd>     - Run command on state change")
-	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -c <cmd> -m <start> <end>  - Custom messages")
+	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -c <cmd> -ms <msg> -me <msg>  - Custom messages")
 	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -r <regex>   - Custom prompt pattern for waiting state")
 	fmt.Fprintln(os.Stderr, "  kiromon -l                        - List all monitored processes")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Standalone mode (run + monitor in one process):")
-	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-m <start> <end>] [-r <regex>] [--] <command> [args...]")
+	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-ms <msg>] [-me <msg>] [-r <regex>] [--] <command> [args...]")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Options:")
+	fmt.Fprintln(os.Stderr, "  -ms <msg>   Message for task start (running state)")
+	fmt.Fprintln(os.Stderr, "  -me <msg>   Message for task end (waiting state)")
+	fmt.Fprintln(os.Stderr, "              If omitted, no notification for that state")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Placeholders in messages:")
+	fmt.Fprintln(os.Stderr, "  {time}      Current time (xx時xx分xx秒)")
+	fmt.Fprintln(os.Stderr, "  {duration}  Task duration (xx時間xx分xx秒)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Examples:")
 	fmt.Fprintln(os.Stderr, "  kiromon kiro-cli chat")
 	fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -c notify-send")
 	fmt.Fprintln(os.Stderr, "  kiromon -p 12345 -d -c notify-send")
-	fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -c voicevox-speak -m \"開始\" \"完了\"")
+	fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -c voicevox-speak -ms \"開始\" -me \"完了\"")
+	fmt.Fprintln(os.Stderr, "  kiromon -c notify-send -me \"完了\" kiro-cli chat  # End only")
 	fmt.Fprintln(os.Stderr, "  kiromon -s kiro-cli -d -r '> ?$'  # Custom prompt pattern")
-	fmt.Fprintln(os.Stderr, "  kiromon -c voicevox-speak -m \"開始\" \"完了\" kiro-cli chat -a  # Standalone")
+	fmt.Fprintln(os.Stderr, "  kiromon -c say -ms \"開始\" -me \"完了\" kiro-cli chat  # Standalone")
 }
 
 func getStatusDir() string {
@@ -235,12 +245,14 @@ type StandaloneConfig struct {
 	PromptPattern *regexp.Regexp
 	LogFile       *os.File
 	logMu         sync.Mutex
+	taskStartTime time.Time
+	taskStartMu   sync.Mutex
 }
 
 func runStandalone() {
 	command := ""
-	startMsg := "タスクを開始しました。"
-	endMsg := "タスクを終了しました。"
+	startMsg := ""
+	endMsg := ""
 	promptPattern := ""
 	var cmdArgs []string
 
@@ -261,14 +273,20 @@ func runStandalone() {
 				cmdArgs = args[i+1:]
 			}
 			i = len(args) // break out of loop
-		case "-m":
-			if i+2 < len(args) {
+		case "-ms":
+			if i+1 < len(args) {
 				i++
 				startMsg = args[i]
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -ms requires a message")
+				os.Exit(1)
+			}
+		case "-me":
+			if i+1 < len(args) {
 				i++
 				endMsg = args[i]
 			} else {
-				fmt.Fprintln(os.Stderr, "Error: -m requires two messages")
+				fmt.Fprintln(os.Stderr, "Error: -me requires a message")
 				os.Exit(1)
 			}
 		case "-r":
@@ -323,6 +341,59 @@ func runStandalone() {
 	}
 
 	runWrapper(cmdArgs, config)
+}
+
+// replacePlaceholders replaces {time} and {duration} in message
+func replacePlaceholders(msg string, taskStart time.Time) string {
+	now := time.Now()
+	
+	// Replace {time} with current time in Japanese format
+	msg = strings.ReplaceAll(msg, "{time}", formatTimeJapanese(now))
+	
+	// Replace {duration} with task duration
+	if !taskStart.IsZero() {
+		duration := now.Sub(taskStart)
+		msg = strings.ReplaceAll(msg, "{duration}", formatDuration(duration))
+	} else {
+		msg = strings.ReplaceAll(msg, "{duration}", "0秒")
+	}
+	
+	return msg
+}
+
+// formatTimeJapanese formats time in Japanese format (xx時xx分xx秒), omitting zero parts
+func formatTimeJapanese(t time.Time) string {
+	h, m, s := t.Hour(), t.Minute(), t.Second()
+	
+	var parts []string
+	if h > 0 {
+		parts = append(parts, fmt.Sprintf("%d時", h))
+	}
+	if m > 0 || h > 0 {
+		parts = append(parts, fmt.Sprintf("%d分", m))
+	}
+	parts = append(parts, fmt.Sprintf("%d秒", s))
+	
+	return strings.Join(parts, "")
+}
+
+// formatDuration formats duration in Japanese format (xx時間xx分xx秒), omitting zero parts
+func formatDuration(d time.Duration) string {
+	totalSeconds := int(d.Seconds())
+	h := totalSeconds / 3600
+	m := (totalSeconds % 3600) / 60
+	s := totalSeconds % 60
+	
+	var parts []string
+	if h > 0 {
+		parts = append(parts, fmt.Sprintf("%d時間", h))
+	}
+	if m > 0 || h > 0 {
+		parts = append(parts, fmt.Sprintf("%d分", m))
+	}
+	parts = append(parts, fmt.Sprintf("%d秒", s))
+	
+	return strings.Join(parts, "")
 }
 
 func logToFile(config *StandaloneConfig, format string, args ...interface{}) {
@@ -507,6 +578,10 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 					lastState = state
 					lastNotifiedState = state
 					stateChangeTime = time.Now()
+					// Initialize task start time
+					standalone.taskStartMu.Lock()
+					standalone.taskStartTime = time.Now()
+					standalone.taskStartMu.Unlock()
 					stateIcon := "🔄"
 					if state == StateWaiting {
 						stateIcon = "⏳"
@@ -520,10 +595,18 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 					// State is stable, check if debounce delay has passed
 					if time.Since(stateChangeTime) >= debounceDelay {
 						var message string
+						standalone.taskStartMu.Lock()
+						taskStart := standalone.taskStartTime
+						standalone.taskStartMu.Unlock()
+						
 						if state == StateWaiting {
-							message = standalone.EndMsg
+							message = replacePlaceholders(standalone.EndMsg, taskStart)
 						} else if state == StateRunning {
-							message = standalone.StartMsg
+							message = replacePlaceholders(standalone.StartMsg, taskStart)
+							// Reset task start time for next cycle
+							standalone.taskStartMu.Lock()
+							standalone.taskStartTime = time.Now()
+							standalone.taskStartMu.Unlock()
 						}
 						
 						stateIcon := "🔄"
@@ -692,8 +775,8 @@ func showStatus() {
 	daemon := false
 	interval := 2.0
 	command := ""
-	startMsg := "タスクを開始しました。"
-	endMsg := "タスクを終了しました。"
+	startMsg := ""
+	endMsg := ""
 	promptPattern := ""
 
 	// Parse flags after -s
@@ -732,15 +815,20 @@ func showStatus() {
 				fmt.Fprintln(os.Stderr, "Error: -c requires a command")
 				os.Exit(1)
 			}
-		case "-m":
-			// Custom messages: -m "start message" "end message"
-			if i+2 < len(args) && !strings.HasPrefix(args[i+1], "-") && !strings.HasPrefix(args[i+2], "-") {
+		case "-ms":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				i++
 				startMsg = args[i]
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -ms requires a message")
+				os.Exit(1)
+			}
+		case "-me":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				i++
 				endMsg = args[i]
 			} else {
-				fmt.Fprintln(os.Stderr, "Error: -m requires two messages (e.g., -m \"Started\" \"Finished\")")
+				fmt.Fprintln(os.Stderr, "Error: -me requires a message")
 				os.Exit(1)
 			}
 		case "-r":
@@ -782,8 +870,8 @@ func showStatusByPID() {
 	daemon := false
 	interval := 2.0
 	command := ""
-	startMsg := "タスクを開始しました。"
-	endMsg := "タスクを終了しました。"
+	startMsg := ""
+	endMsg := ""
 	promptPattern := ""
 
 	// Parse flags after -p
@@ -805,10 +893,13 @@ func showStatusByPID() {
 				i++
 				command = args[i]
 			}
-		case "-m":
-			if i+2 < len(args) && !strings.HasPrefix(args[i+1], "-") && !strings.HasPrefix(args[i+2], "-") {
+		case "-ms":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				i++
 				startMsg = args[i]
+			}
+		case "-me":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				i++
 				endMsg = args[i]
 			}
@@ -939,6 +1030,7 @@ func runStatusDaemon(name string, pid int, interval float64, command string, sta
 
 	// Track state per PID
 	lastStates := make(map[int]string)
+	taskStartTimes := make(map[int]time.Time)
 
 	checkStatus := func() {
 		// If specific PID requested, only check that one
@@ -963,7 +1055,7 @@ func runStatusDaemon(name string, pid int, interval float64, command string, sta
 				return
 			}
 			
-			checkAndNotify(status, customPromptRe, lastStates, command, startMsg, endMsg)
+			checkAndNotify(status, customPromptRe, lastStates, taskStartTimes, command, startMsg, endMsg)
 			return
 		}
 
@@ -1002,7 +1094,7 @@ func runStatusDaemon(name string, pid int, interval float64, command string, sta
 			}
 			
 			foundAny = true
-			checkAndNotify(status, customPromptRe, lastStates, command, startMsg, endMsg)
+			checkAndNotify(status, customPromptRe, lastStates, taskStartTimes, command, startMsg, endMsg)
 		}
 		
 		if !foundAny && len(lastStates) > 0 {
@@ -1030,7 +1122,7 @@ func runStatusDaemon(name string, pid int, interval float64, command string, sta
 	}
 }
 
-func checkAndNotify(status *Status, customPromptRe *regexp.Regexp, lastStates map[int]string, command, startMsg, endMsg string) {
+func checkAndNotify(status *Status, customPromptRe *regexp.Regexp, lastStates map[int]string, taskStartTimes map[int]time.Time, command, startMsg, endMsg string) {
 	// Determine state using custom pattern if provided
 	currentState := status.State
 	if customPromptRe != nil {
@@ -1046,10 +1138,17 @@ func checkAndNotify(status *Status, customPromptRe *regexp.Regexp, lastStates ma
 	// Detect state change
 	if lastState != currentState {
 		var message string
+		taskStart := taskStartTimes[status.PID]
+		
 		if currentState == StateWaiting {
-			message = endMsg
+			message = replacePlaceholders(endMsg, taskStart)
 		} else if currentState == StateRunning && lastState == StateWaiting {
-			message = startMsg
+			message = replacePlaceholders(startMsg, taskStart)
+			// Reset task start time for next cycle
+			taskStartTimes[status.PID] = time.Now()
+		} else if currentState == StateRunning && lastState == "" {
+			// First time seeing this PID in running state
+			taskStartTimes[status.PID] = time.Now()
 		}
 
 		// Print state change
@@ -1059,6 +1158,7 @@ func checkAndNotify(status *Status, customPromptRe *regexp.Regexp, lastStates ma
 		}
 		fmt.Printf("[%s] PID %d: %s %s\n", time.Now().Format("15:04:05"), status.PID, stateIcon, currentState)
 
+		// Only execute command if message is not empty
 		if message != "" && lastState != "" {
 			fmt.Printf("[%s] %s\n", time.Now().Format("15:04:05"), message)
 
