@@ -27,3 +27,4 @@ go.work.sum
 .DS_Store
 Thumbs.db
 kiromon.log
+.serena/
