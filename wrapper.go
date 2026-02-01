@@ -41,11 +41,17 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	// Apply preset from config if standalone is nil (bare wrapper mode)
 	if standalone == nil {
 		if preset := getPreset(name); preset != nil {
-			if preset.Command != "" || preset.StartMsg != "" || preset.EndMsg != "" {
+			if preset.Command != "" || preset.StartMsg != "" || preset.EndMsg != "" || preset.PromptPattern != "" {
 				standalone = &StandaloneConfig{
 					Command:  preset.Command,
 					StartMsg: preset.StartMsg,
 					EndMsg:   preset.EndMsg,
+				}
+				// Apply prompt pattern from preset
+				if preset.PromptPattern != "" {
+					if re, err := regexp.Compile(preset.PromptPattern); err == nil {
+						standalone.PromptPattern = re
+					}
 				}
 				// Apply default_command if preset has no command
 				if standalone.Command == "" {

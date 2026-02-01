@@ -25,6 +25,7 @@ presets:
   # kiro-cli 用のプリセット
   kiro-cli:
     command: voicevox-speak-standalone
+    prompt_pattern: '> ?$'
     start_msg: "{time}、タスクを開始したのだ"
     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
 
@@ -35,5 +36,6 @@ presets:
   #
   # python:
   #   command: say
+  #   prompt_pattern: '>>> $'
   #   start_msg: "Python スクリプト実行中..."
   #   end_msg: "Python スクリプト完了"
