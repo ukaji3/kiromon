@@ -40,6 +40,7 @@ type StandaloneConfig struct {
 	LogMu         sync.Mutex
 	TaskStartTime time.Time
 	TaskStartMu   sync.Mutex
+	MinDuration   time.Duration
 }
 
 // PresetConfig holds preset configuration for a specific command

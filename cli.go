@@ -120,13 +120,14 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  kiromon -l                        - List all monitored processes")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Standalone mode (run + monitor in one process):")
-	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-ms <msg>] [-me <msg>] [-r <regex>] [-log <path>] [--] <command> [args...]")
+	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-ms <msg>] [-me <msg>] [-r <regex>] [-log <path>] [-min-duration <dur>] [--] <command> [args...]")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Options:")
-	fmt.Fprintln(os.Stderr, "  -ms <msg>   Message for task start (running state)")
-	fmt.Fprintln(os.Stderr, "  -me <msg>   Message for task end (waiting state)")
-	fmt.Fprintln(os.Stderr, "              If omitted, no notification for that state")
-	fmt.Fprintln(os.Stderr, "  -log <path> Log file path (default: kiromon.log)")
+	fmt.Fprintln(os.Stderr, "  -ms <msg>          Message for task start (running state)")
+	fmt.Fprintln(os.Stderr, "  -me <msg>          Message for task end (waiting state)")
+	fmt.Fprintln(os.Stderr, "                     If omitted, no notification for that state")
+	fmt.Fprintln(os.Stderr, "  -log <path>        Log file path (default: kiromon.log)")
+	fmt.Fprintln(os.Stderr, "  -min-duration <d>  Minimum task duration to trigger notification (e.g., 5s)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Placeholders in messages:")
 	fmt.Fprintln(os.Stderr, "  {time}      Current time (xx時xx分xx秒)")
@@ -149,6 +150,7 @@ func runStandalone() {
 	endMsg := ""
 	promptPattern := ""
 	logPath := "kiromon.log"
+	var minDuration time.Duration
 	var cmdArgs []string
 
 	// First, get the command after -c (os.Args[1] is "-c")
@@ -198,6 +200,19 @@ func runStandalone() {
 				logPath = args[i]
 			} else {
 				fmt.Fprintln(os.Stderr, "Error: -log requires a file path")
+				os.Exit(1)
+			}
+		case "-min-duration":
+			if i+1 < len(args) {
+				i++
+				d, err := time.ParseDuration(args[i])
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Invalid duration: %s\n", args[i])
+					os.Exit(1)
+				}
+				minDuration = d
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -min-duration requires a duration (e.g., 5s)")
 				os.Exit(1)
 			}
 		default:
@@ -262,6 +277,7 @@ func runStandalone() {
 		EndMsg:        endMsg,
 		PromptPattern: promptRe,
 		LogFile:       logFile,
+		MinDuration:   minDuration,
 	}
 
 	runWrapper(cmdArgs, config)

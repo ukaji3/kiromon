@@ -212,6 +212,13 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 						standalone.TaskStartMu.Unlock()
 
 						if state == StateWaiting {
+							// Check minimum duration before notifying
+							taskDuration := time.Since(taskStart)
+							if standalone.MinDuration > 0 && taskDuration < standalone.MinDuration {
+								logToFile(standalone, "Skipping notification: duration %v < min %v", taskDuration, standalone.MinDuration)
+								lastNotifiedState = state
+								continue
+							}
 							message = replacePlaceholders(standalone.EndMsg, taskStart)
 						} else if state == StateRunning {
 							message = replacePlaceholders(standalone.StartMsg, taskStart)
