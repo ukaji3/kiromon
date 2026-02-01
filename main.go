@@ -6,8 +6,13 @@ func main() {
 	// Cleanup stale files on startup
 	cleanupStaleFiles()
 
-	// Initialize prompt patterns
-	promptPatterns = compilePromptPatterns(DefaultPromptPatterns)
+	// Load config file and initialize prompt patterns
+	config := loadConfig()
+	if config != nil && len(config.PromptPatterns) > 0 {
+		promptPatterns = compilePromptPatterns(config.PromptPatterns)
+	} else {
+		promptPatterns = compilePromptPatterns(DefaultPromptPatterns)
+	}
 
 	// Check mode: wrapper or status checker
 	if len(os.Args) >= 2 && os.Args[1] == "-s" {

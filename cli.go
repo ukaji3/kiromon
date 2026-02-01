@@ -219,6 +219,27 @@ func runStandalone() {
 		os.Exit(1)
 	}
 
+	// Apply preset if available and options not explicitly set
+	cmdName := filepath.Base(cmdArgs[0])
+	if preset := getPreset(cmdName); preset != nil {
+		if startMsg == "" {
+			startMsg = preset.StartMsg
+		}
+		if endMsg == "" {
+			endMsg = preset.EndMsg
+		}
+	}
+
+	// Apply config file defaults
+	if config := loadConfig(); config != nil {
+		if command == "" && config.DefaultCommand != "" {
+			command = config.DefaultCommand
+		}
+		if logPath == "kiromon.log" && config.LogPath != "" {
+			logPath = config.LogPath
+		}
+	}
+
 	// Open log file
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
