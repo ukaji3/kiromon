@@ -38,6 +38,25 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	// Determine process name from command
 	name := filepath.Base(args[0])
 
+	// Apply preset from config if standalone is nil (bare wrapper mode)
+	if standalone == nil {
+		if preset := getPreset(name); preset != nil {
+			if preset.Command != "" || preset.StartMsg != "" || preset.EndMsg != "" {
+				standalone = &StandaloneConfig{
+					Command:  preset.Command,
+					StartMsg: preset.StartMsg,
+					EndMsg:   preset.EndMsg,
+				}
+				// Apply default_command if preset has no command
+				if standalone.Command == "" {
+					if config := loadConfig(); config != nil && config.DefaultCommand != "" {
+						standalone.Command = config.DefaultCommand
+					}
+				}
+			}
+		}
+	}
+
 	// Create command
 	cmd := exec.Command(args[0], args[1:]...)
 
