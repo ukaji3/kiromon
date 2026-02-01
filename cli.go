@@ -285,6 +285,7 @@ func runStandalone() {
 	}
 
 	runWrapper(cmdArgs, config)
+	os.Exit(exitCode)
 }
 
 // showStatus handles -s mode (show status or daemon mode)

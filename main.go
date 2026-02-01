@@ -61,9 +61,10 @@ func main() {
 			os.Exit(1)
 		}
 		runWrapper(os.Args[2:], nil)
-		return
+		os.Exit(exitCode)
 	}
 
 	// Default: run wrapper mode
 	runWrapper(os.Args[1:], nil)
+	os.Exit(exitCode)
 }

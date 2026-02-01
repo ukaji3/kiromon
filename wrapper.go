@@ -17,6 +17,9 @@ import (
 	"golang.org/x/term"
 )
 
+// exitCode stores the exit code to return after cleanup
+var exitCode int
+
 // Wrapper state variables
 var (
 	statusFile       string
@@ -271,11 +274,13 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 		standalone.LogFile.Close()
 	}
 
+	// Store exit code but don't call os.Exit here (let defer run first)
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = 1
 		}
-		os.Exit(1)
 	}
 }
 
