@@ -46,6 +46,7 @@ type StandaloneConfig struct {
 
 // PresetConfig holds preset configuration for a specific command
 type PresetConfig struct {
+	Command  string `yaml:"command"`
 	StartMsg string `yaml:"start_msg"`
 	EndMsg   string `yaml:"end_msg"`
 }
@@ -121,6 +122,7 @@ prompt_patterns:
 # コマンドごとのプリセット設定
 # presets:
 #   kiro-cli:
+#     command: voicevox-speak-standalone
 #     start_msg: "{time}、タスクを開始したのだ"
 #     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
 `

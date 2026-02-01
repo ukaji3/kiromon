@@ -20,17 +20,20 @@ prompt_patterns:
 log_path: ~/kiromon.log
 
 # コマンドごとのプリセット設定
-# コマンド名をキーとして、デフォルトのメッセージを設定できます
+# コマンド名をキーとして、通知コマンドとメッセージを設定できます
 presets:
   # kiro-cli 用のプリセット
   kiro-cli:
+    command: voicevox-speak-standalone
     start_msg: "{time}、タスクを開始したのだ"
     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
 
   # 汎用的なプリセット例
   # vim:
+  #   command: notify-send
   #   end_msg: "vim を終了しました"
   #
   # python:
+  #   command: say
   #   start_msg: "Python スクリプト実行中..."
   #   end_msg: "Python スクリプト完了"

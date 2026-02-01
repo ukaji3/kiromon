@@ -238,6 +238,9 @@ func runStandalone() {
 	// Apply preset if available and options not explicitly set
 	cmdName := filepath.Base(cmdArgs[0])
 	if preset := getPreset(cmdName); preset != nil {
+		if command == "" && preset.Command != "" {
+			command = preset.Command
+		}
 		if startMsg == "" {
 			startMsg = preset.StartMsg
 		}
