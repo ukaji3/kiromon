@@ -120,12 +120,13 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  kiromon -l                        - List all monitored processes")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Standalone mode (run + monitor in one process):")
-	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-ms <msg>] [-me <msg>] [-r <regex>] [--] <command> [args...]")
+	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-ms <msg>] [-me <msg>] [-r <regex>] [-log <path>] [--] <command> [args...]")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Options:")
 	fmt.Fprintln(os.Stderr, "  -ms <msg>   Message for task start (running state)")
 	fmt.Fprintln(os.Stderr, "  -me <msg>   Message for task end (waiting state)")
 	fmt.Fprintln(os.Stderr, "              If omitted, no notification for that state")
+	fmt.Fprintln(os.Stderr, "  -log <path> Log file path (default: kiromon.log)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Placeholders in messages:")
 	fmt.Fprintln(os.Stderr, "  {time}      Current time (xx時xx分xx秒)")
@@ -147,6 +148,7 @@ func runStandalone() {
 	startMsg := ""
 	endMsg := ""
 	promptPattern := ""
+	logPath := "kiromon.log"
 	var cmdArgs []string
 
 	// First, get the command after -c (os.Args[1] is "-c")
@@ -190,6 +192,14 @@ func runStandalone() {
 				fmt.Fprintln(os.Stderr, "Error: -r requires a regex pattern")
 				os.Exit(1)
 			}
+		case "-log":
+			if i+1 < len(args) {
+				i++
+				logPath = args[i]
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -log requires a file path")
+				os.Exit(1)
+			}
 		default:
 			// First non-option is the command to run
 			if !strings.HasPrefix(args[i], "-") {
@@ -210,9 +220,9 @@ func runStandalone() {
 	}
 
 	// Open log file
-	logFile, err := os.OpenFile("kiromon.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not open kiromon.log: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: could not open %s: %v\n", logPath, err)
 	}
 
 	var promptRe *regexp.Regexp
