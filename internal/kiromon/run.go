@@ -19,13 +19,8 @@ func Run() int {
 		return 0
 	}
 
-	// Load config file and initialize prompt patterns
-	config := loadConfig()
-	if config != nil && len(config.PromptPatterns) > 0 {
-		promptPatterns = compilePromptPatterns(config.PromptPatterns)
-	} else {
-		promptPatterns = compilePromptPatterns(DefaultPromptPatterns)
-	}
+	// Initialize default prompt patterns
+	promptPatterns = compilePromptPatterns(DefaultPromptPatterns)
 
 	// Check mode: wrapper or status checker
 	if len(os.Args) >= 2 && os.Args[1] == "-s" {

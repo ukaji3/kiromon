@@ -273,21 +273,19 @@ done
 # デフォルトの通知コマンド
 default_command: notify-send
 
-# プロンプト検出パターン（複数指定可）
-prompt_patterns:
-  - '> ?$'
-  - '\$ $'
-
 # ログファイルパス
 log_path: ~/kiromon.log
 
 # コマンドごとのプリセット
+# プロンプトパターンはコマンドごとに異なるため、プリセットで個別に設定
 presets:
   kiro-cli:
     command: voicevox-speak-standalone
     prompt_pattern: '> ?$'
     start_msg: "{time}、タスクを開始したのだ"
     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
+  python:
+    prompt_pattern: '>>> $'
 ```
 
 設定ファイルが存在しない場合は、組み込みのデフォルト値が使用されます。

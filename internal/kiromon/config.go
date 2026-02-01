@@ -55,7 +55,6 @@ type PresetConfig struct {
 // FileConfig represents the configuration file structure
 type FileConfig struct {
 	DefaultCommand string                  `yaml:"default_command"`
-	PromptPatterns []string                `yaml:"prompt_patterns"`
 	LogPath        string                  `yaml:"log_path"`
 	Presets        map[string]PresetConfig `yaml:"presets"`
 }
@@ -112,10 +111,6 @@ const defaultConfigContent = `# kiromon 設定ファイル
 
 # デフォルトの通知コマンド
 # default_command: notify-send
-
-# プロンプト検出パターン（正規表現、複数指定可）
-prompt_patterns:
-  - '> ?$'
 
 # ログファイルパス
 # log_path: ~/kiromon.log
