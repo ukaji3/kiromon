@@ -6,6 +6,12 @@ func main() {
 	// Cleanup stale files on startup
 	cleanupStaleFiles()
 
+	// Check for help options
+	if len(os.Args) >= 2 && (os.Args[1] == "-h" || os.Args[1] == "--help" || os.Args[1] == "-help") {
+		printUsage()
+		return
+	}
+
 	// Check for -init option
 	if len(os.Args) >= 2 && os.Args[1] == "-init" {
 		initConfig()
@@ -46,6 +52,12 @@ func main() {
 	if os.Args[1] == "-c" {
 		runStandalone()
 		return
+	}
+
+	// Handle bare "--" as first argument (no command specified)
+	if os.Args[1] == "--" {
+		printUsage()
+		os.Exit(1)
 	}
 
 	// Default: run wrapper mode
