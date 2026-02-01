@@ -1,4 +1,4 @@
-package main
+package kiromon
 
 import (
 	"encoding/json"
