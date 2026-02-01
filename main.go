@@ -6,6 +6,12 @@ func main() {
 	// Cleanup stale files on startup
 	cleanupStaleFiles()
 
+	// Check for -init option
+	if len(os.Args) >= 2 && os.Args[1] == "-init" {
+		initConfig()
+		return
+	}
+
 	// Load config file and initialize prompt patterns
 	config := loadConfig()
 	if config != nil && len(config.PromptPatterns) > 0 {

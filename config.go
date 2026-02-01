@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -102,3 +103,50 @@ func getPreset(cmdName string) *PresetConfig {
 	return nil
 }
 
+
+// defaultConfigContent is the default config file content
+const defaultConfigContent = `# kiromon 設定ファイル
+# 配置場所: ~/.config/kiromon/config.yaml
+
+# デフォルトの通知コマンド
+# default_command: notify-send
+
+# プロンプト検出パターン（正規表現、複数指定可）
+prompt_patterns:
+  - '> ?$'
+
+# ログファイルパス
+# log_path: ~/kiromon.log
+
+# コマンドごとのプリセット設定
+# presets:
+#   kiro-cli:
+#     start_msg: "{time}、タスクを開始したのだ"
+#     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
+`
+
+// initConfig creates the default config file
+func initConfig() {
+	configPath := getConfigPath()
+	configDir := filepath.Dir(configPath)
+
+	// Check if config already exists
+	if _, err := os.Stat(configPath); err == nil {
+		fmt.Printf("Config file already exists: %s\n", configPath)
+		return
+	}
+
+	// Create config directory
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating config directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Write default config
+	if err := os.WriteFile(configPath, []byte(defaultConfigContent), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing config file: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Created config file: %s\n", configPath)
+}

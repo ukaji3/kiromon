@@ -118,6 +118,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -c <cmd> -ms <msg> -me <msg>  - Custom messages")
 	fmt.Fprintln(os.Stderr, "  kiromon -s <name> -d -r <regex>   - Custom prompt pattern for waiting state")
 	fmt.Fprintln(os.Stderr, "  kiromon -l                        - List all monitored processes")
+	fmt.Fprintln(os.Stderr, "  kiromon -init                     - Create default config file")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Standalone mode (run + monitor in one process):")
 	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-ms <msg>] [-me <msg>] [-r <regex>] [-log <path>] [-min-duration <dur>] [--] <command> [args...]")
