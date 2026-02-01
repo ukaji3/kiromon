@@ -265,6 +265,8 @@ done
 
 `~/.config/kiromon/config.yaml` でデフォルト設定を管理できます（オプション）。
 
+サンプル設定ファイル: [config.example.yaml](config.example.yaml)
+
 ```yaml
 # デフォルトの通知コマンド
 default_command: notify-send
