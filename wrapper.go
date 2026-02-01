@@ -102,7 +102,9 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 				activityMu.Lock()
 				lastActivity = time.Now()
 				activityMu.Unlock()
-				ptmx.Write(buf[:n])
+				if _, err := ptmx.Write(buf[:n]); err != nil {
+					return // PTY closed
+				}
 			}
 		}
 	}()
@@ -118,7 +120,9 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 				return
 			}
 
-			os.Stdout.Write(buf[:n])
+			if _, err := os.Stdout.Write(buf[:n]); err != nil {
+				return // stdout closed
+			}
 
 			activityMu.Lock()
 			lastActivity = time.Now()
