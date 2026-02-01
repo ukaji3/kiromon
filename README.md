@@ -265,6 +265,8 @@ done
 
 `~/.config/kiromon/config.yaml` でデフォルト設定を管理できます（オプション）。
 
+`kiromon -init` で設定ファイルのテンプレートを作成できます。
+
 サンプル設定ファイル: [docs/config.example.yaml](docs/config.example.yaml)
 
 ```yaml
@@ -277,11 +279,13 @@ prompt_patterns:
   - '\$ $'
 
 # ログファイルパス
-log_path: /var/log/kiromon.log
+log_path: ~/kiromon.log
 
 # コマンドごとのプリセット
 presets:
   kiro-cli:
+    command: voicevox-speak-standalone
+    prompt_pattern: '> ?$'
     start_msg: "{time}、タスクを開始したのだ"
     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
 ```
