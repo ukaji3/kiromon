@@ -11,6 +11,99 @@ import (
 	"time"
 )
 
+// MonitorOptions holds common options for status monitoring
+type MonitorOptions struct {
+	Name          string
+	PID           int
+	Daemon        bool
+	Interval      float64
+	Command       string
+	StartMsg      string
+	EndMsg        string
+	PromptPattern string
+}
+
+// parseMonitorOptions parses common monitor options from args
+// Returns the options and the remaining unparsed arguments
+func parseMonitorOptions(args []string) *MonitorOptions {
+	opts := &MonitorOptions{
+		Interval: DefaultPollInterval,
+	}
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "-d":
+			opts.Daemon = true
+		case "-p":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				if _, err := fmt.Sscanf(args[i], "%d", &opts.PID); err != nil {
+					fmt.Fprintf(os.Stderr, "Invalid PID: %s\n", args[i])
+					os.Exit(1)
+				}
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -p requires a PID number")
+				os.Exit(1)
+			}
+		case "-i":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				if _, err := fmt.Sscanf(args[i], "%f", &opts.Interval); err != nil {
+					fmt.Fprintf(os.Stderr, "Invalid interval: %s\n", args[i])
+					os.Exit(1)
+				}
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -i requires a number (e.g., -i 2)")
+				os.Exit(1)
+			}
+		case "-c":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				opts.Command = args[i]
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -c requires a command")
+				os.Exit(1)
+			}
+		case "-ms":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				opts.StartMsg = args[i]
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -ms requires a message")
+				os.Exit(1)
+			}
+		case "-me":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				opts.EndMsg = args[i]
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -me requires a message")
+				os.Exit(1)
+			}
+		case "-r":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				opts.PromptPattern = args[i]
+				// Validate regex
+				if _, err := regexp.Compile(opts.PromptPattern); err != nil {
+					fmt.Fprintf(os.Stderr, "Invalid regex pattern: %v\n", err)
+					os.Exit(1)
+				}
+			} else {
+				fmt.Fprintln(os.Stderr, "Error: -r requires a regex pattern")
+				os.Exit(1)
+			}
+		default:
+			// Non-option argument: treat as name or PID
+			if !strings.HasPrefix(args[i], "-") && opts.Name == "" {
+				opts.Name = args[i]
+			}
+		}
+	}
+
+	return opts
+}
+
 // printUsage prints the usage information
 func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage:")
@@ -145,172 +238,55 @@ func runStandalone() {
 
 // showStatus handles -s mode (show status or daemon mode)
 func showStatus() {
-	var name string
-	var pid int
-	daemon := false
-	interval := DefaultPollInterval
-	command := ""
-	startMsg := ""
-	endMsg := ""
-	promptPattern := ""
+	opts := parseMonitorOptions(os.Args[2:])
 
-	// Parse flags after -s
-	args := os.Args[2:]
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "-d":
-			daemon = true
-		case "-p":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				if _, err := fmt.Sscanf(args[i], "%d", &pid); err != nil {
-					fmt.Fprintf(os.Stderr, "Invalid PID: %s\n", args[i])
-					os.Exit(1)
-				}
-			} else {
-				fmt.Fprintln(os.Stderr, "Error: -p requires a PID number")
-				os.Exit(1)
-			}
-		case "-i":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				if _, err := fmt.Sscanf(args[i], "%f", &interval); err != nil {
-					fmt.Fprintf(os.Stderr, "Invalid interval: %s\n", args[i])
-					os.Exit(1)
-				}
-			} else {
-				fmt.Fprintln(os.Stderr, "Error: -i requires a number (e.g., -i 2)")
-				os.Exit(1)
-			}
-		case "-c":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				command = args[i]
-			} else {
-				fmt.Fprintln(os.Stderr, "Error: -c requires a command")
-				os.Exit(1)
-			}
-		case "-ms":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				startMsg = args[i]
-			} else {
-				fmt.Fprintln(os.Stderr, "Error: -ms requires a message")
-				os.Exit(1)
-			}
-		case "-me":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				endMsg = args[i]
-			} else {
-				fmt.Fprintln(os.Stderr, "Error: -me requires a message")
-				os.Exit(1)
-			}
-		case "-r":
-			// Custom prompt regex pattern
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				promptPattern = args[i]
-				// Validate regex
-				if _, err := regexp.Compile(promptPattern); err != nil {
-					fmt.Fprintf(os.Stderr, "Invalid regex pattern: %v\n", err)
-					os.Exit(1)
-				}
-			} else {
-				fmt.Fprintln(os.Stderr, "Error: -r requires a regex pattern")
-				os.Exit(1)
-			}
-		default:
-			if !strings.HasPrefix(args[i], "-") && name == "" {
-				name = args[i]
-			}
-		}
-	}
-
-	if name == "" {
+	if opts.Name == "" {
 		listProcesses()
 		return
 	}
 
-	if daemon {
-		runStatusDaemon(name, pid, interval, command, startMsg, endMsg, promptPattern)
+	if opts.Daemon {
+		runStatusDaemon(opts.Name, opts.PID, opts.Interval, opts.Command, opts.StartMsg, opts.EndMsg, opts.PromptPattern)
 	} else {
-		showSingleStatus(name, pid)
+		showSingleStatus(opts.Name, opts.PID)
 	}
 }
 
 // showStatusByPID handles -p <pid> mode (without -s)
 func showStatusByPID() {
+	// Parse PID from first argument
 	var pid int
-	daemon := false
-	interval := DefaultPollInterval
-	command := ""
-	startMsg := ""
-	endMsg := ""
-	promptPattern := ""
-
-	// Parse flags after -p
-	args := os.Args[2:]
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "-d":
-			daemon = true
-		case "-i":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				if _, err := fmt.Sscanf(args[i], "%f", &interval); err != nil {
-					fmt.Fprintf(os.Stderr, "Invalid interval: %s\n", args[i])
-					os.Exit(1)
-				}
-			}
-		case "-c":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				command = args[i]
-			}
-		case "-ms":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				startMsg = args[i]
-			}
-		case "-me":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				endMsg = args[i]
-			}
-		case "-r":
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				i++
-				promptPattern = args[i]
-			}
-		default:
-			if !strings.HasPrefix(args[i], "-") && pid == 0 {
-				if _, err := fmt.Sscanf(args[i], "%d", &pid); err != nil {
-					fmt.Fprintf(os.Stderr, "Invalid PID: %s\n", args[i])
-					os.Exit(1)
-				}
-			}
+	if len(os.Args) >= 3 && !strings.HasPrefix(os.Args[2], "-") {
+		if _, err := fmt.Sscanf(os.Args[2], "%d", &pid); err != nil {
+			fmt.Fprintf(os.Stderr, "Invalid PID: %s\n", os.Args[2])
+			os.Exit(1)
 		}
 	}
 
-	if pid == 0 {
+	// Parse remaining options
+	opts := parseMonitorOptions(os.Args[2:])
+	if pid != 0 {
+		opts.PID = pid
+	}
+
+	if opts.PID == 0 {
 		fmt.Fprintln(os.Stderr, "Error: -p requires a PID number")
 		os.Exit(1)
 	}
 
 	// Find status file by PID
-	filePath, err := findStatusFileByPID(pid)
+	filePath, err := findStatusFileByPID(opts.PID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "No status found for PID %d\n", pid)
+		fmt.Fprintf(os.Stderr, "No status found for PID %d\n", opts.PID)
 		os.Exit(1)
 	}
 
 	// Extract name from filename (e.g., "kiro-cli-12345.json" -> "kiro-cli")
 	baseName := filepath.Base(filePath)
-	name := strings.TrimSuffix(baseName, fmt.Sprintf("-%d.json", pid))
+	name := strings.TrimSuffix(baseName, fmt.Sprintf("-%d.json", opts.PID))
 
-	if daemon {
-		runStatusDaemon(name, pid, interval, command, startMsg, endMsg, promptPattern)
+	if opts.Daemon {
+		runStatusDaemon(name, opts.PID, opts.Interval, opts.Command, opts.StartMsg, opts.EndMsg, opts.PromptPattern)
 	} else {
 		status, err := readStatusWithLock(filePath)
 		if err != nil {
