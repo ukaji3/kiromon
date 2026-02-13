@@ -15,11 +15,12 @@ log_path: ~/kiromon.log
 # コマンドごとのプリセット設定
 # コマンド名をキーとして、通知コマンド、プロンプトパターン、メッセージを設定できます
 # プロンプトパターンはコマンドごとに異なるため、プリセットで個別に設定してください
+# パターンは行中に含まれるかどうかでマッチします（行末マッチではない）
 presets:
   # kiro-cli 用のプリセット
   kiro-cli:
     command: voicevox-speak-standalone
-    prompt_pattern: '> ?$'
+    prompt_pattern: '!> '
     start_msg: "{time}、タスクを開始したのだ"
     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
 
@@ -30,9 +31,9 @@ presets:
   #
   # python:
   #   command: say
-  #   prompt_pattern: '>>> $'
+  #   prompt_pattern: '>>> '
   #   start_msg: "Python スクリプト実行中..."
   #   end_msg: "Python スクリプト完了"
   #
   # bash:
-  #   prompt_pattern: '\$ $'
+  #   prompt_pattern: '\$ '

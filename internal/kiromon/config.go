@@ -28,7 +28,7 @@ const (
 
 // Default prompt patterns for detecting input-waiting state
 var DefaultPromptPatterns = []string{
-	`> ?$`, // kiro-cli prompt ends with ">" or "> "
+	`!> `, // kiro-cli prompt contains "!> "
 }
 
 // StandaloneConfig holds configuration for standalone mode
@@ -119,7 +119,7 @@ const defaultConfigContent = `# kiromon 設定ファイル
 # presets:
 #   kiro-cli:
 #     command: voicevox-speak-standalone
-#     prompt_pattern: '> ?$'
+#     prompt_pattern: '!> '
 #     start_msg: "{time}、タスクを開始したのだ"
 #     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
 `

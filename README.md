@@ -278,14 +278,15 @@ log_path: ~/kiromon.log
 
 # コマンドごとのプリセット
 # プロンプトパターンはコマンドごとに異なるため、プリセットで個別に設定
+# パターンは行中に含まれるかどうかでマッチします
 presets:
   kiro-cli:
     command: voicevox-speak-standalone
-    prompt_pattern: '> ?$'
+    prompt_pattern: '!> '
     start_msg: "{time}、タスクを開始したのだ"
     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
   python:
-    prompt_pattern: '>>> $'
+    prompt_pattern: '>>> '
 ```
 
 設定ファイルが存在しない場合は、組み込みのデフォルト値が使用されます。

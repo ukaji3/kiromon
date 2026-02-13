@@ -28,3 +28,4 @@ go.work.sum
 Thumbs.db
 kiromon.log
 .serena/
+.temp/
