@@ -3,6 +3,7 @@ package kiromon
 import (
 	"encoding/json"
 	"fmt"
+	"log/syslog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -58,6 +59,10 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 					if config := loadConfig(); config != nil && config.DefaultCommand != "" {
 						standalone.Command = config.DefaultCommand
 					}
+				}
+				// Open syslog
+				if sw, err := syslog.New(syslog.LOG_INFO|syslog.LOG_USER, "kiromon"); err == nil {
+					standalone.Syslog = sw
 				}
 			}
 		}
