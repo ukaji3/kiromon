@@ -293,10 +293,15 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	// Cleanup: remove status file on exit
 	os.Remove(statusFile)
 
-	// Close log file if standalone mode
-	if standalone != nil && standalone.LogFile != nil {
+	// Close log resources if standalone mode
+	if standalone != nil {
 		logToFile(standalone, "Process terminated")
-		standalone.LogFile.Close()
+		if standalone.LogFile != nil {
+			standalone.LogFile.Close()
+		}
+		if standalone.Syslog != nil {
+			standalone.Syslog.Close()
+		}
 	}
 
 	// Store exit code but don't call os.Exit here (let defer run first)

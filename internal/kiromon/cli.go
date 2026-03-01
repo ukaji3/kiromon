@@ -2,6 +2,7 @@ package kiromon
 
 import (
 	"fmt"
+	"log/syslog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -127,7 +128,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  -ms <msg>          Message for task start (running state)")
 	fmt.Fprintln(os.Stderr, "  -me <msg>          Message for task end (waiting state)")
 	fmt.Fprintln(os.Stderr, "                     If omitted, no notification for that state")
-	fmt.Fprintln(os.Stderr, "  -log <path>        Log file path (default: kiromon.log)")
+	fmt.Fprintln(os.Stderr, "  -log <path>        Log file path (default: syslog only)")
 	fmt.Fprintln(os.Stderr, "  -min-duration <d>  Minimum task duration to trigger notification (e.g., 5s)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Placeholders in messages:")
@@ -150,7 +151,7 @@ func runStandalone() {
 	startMsg := ""
 	endMsg := ""
 	promptPattern := ""
-	logPath := "kiromon.log"
+	logPath := ""
 	var minDuration time.Duration
 	var cmdArgs []string
 
@@ -254,15 +255,24 @@ func runStandalone() {
 		if command == "" && config.DefaultCommand != "" {
 			command = config.DefaultCommand
 		}
-		if logPath == "kiromon.log" && config.LogPath != "" {
+		if logPath == "" && config.LogPath != "" {
 			logPath = config.LogPath
 		}
 	}
 
-	// Open log file
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// Open syslog
+	syslogWriter, err := syslog.New(syslog.LOG_INFO|syslog.LOG_USER, "kiromon")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not open %s: %v\n", logPath, err)
+		fmt.Fprintf(os.Stderr, "Warning: could not open syslog: %v\n", err)
+	}
+
+	// Open log file if specified
+	var logFile *os.File
+	if logPath != "" {
+		logFile, err = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not open %s: %v\n", logPath, err)
+		}
 	}
 
 	var promptRe *regexp.Regexp
@@ -281,6 +291,7 @@ func runStandalone() {
 		EndMsg:        endMsg,
 		PromptPattern: promptRe,
 		LogFile:       logFile,
+		Syslog:        syslogWriter,
 		MinDuration:   minDuration,
 	}
 

@@ -61,15 +61,20 @@ func formatDuration(d time.Duration) string {
 	return strings.Join(parts, "")
 }
 
-// logToFile writes a log message to the config's log file
+// logToFile writes a log message to the config's log file or syslog
 func logToFile(config *StandaloneConfig, format string, args ...interface{}) {
-	if config == nil || config.LogFile == nil {
+	if config == nil {
 		return
 	}
 	config.LogMu.Lock()
 	defer config.LogMu.Unlock()
-	msg := fmt.Sprintf("[%s] %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, args...))
-	config.LogFile.WriteString(msg)
+	msg := fmt.Sprintf(format, args...)
+	if config.Syslog != nil {
+		config.Syslog.Info(msg)
+	}
+	if config.LogFile != nil {
+		fmt.Fprintf(config.LogFile, "[%s] %s\n", time.Now().Format("2006-01-02 15:04:05"), msg)
+	}
 }
 
 // checkAndNotify checks for state changes and sends notifications

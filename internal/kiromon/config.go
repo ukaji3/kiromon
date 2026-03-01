@@ -2,6 +2,7 @@ package kiromon
 
 import (
 	"fmt"
+	"log/syslog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -38,6 +39,7 @@ type StandaloneConfig struct {
 	EndMsg        string
 	PromptPattern *regexp.Regexp
 	LogFile       *os.File
+	Syslog        *syslog.Writer
 	LogMu         sync.Mutex
 	TaskStartTime time.Time
 	TaskStartMu   sync.Mutex
