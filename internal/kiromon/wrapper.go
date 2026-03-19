@@ -171,11 +171,11 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 					}
 					lineBuf.Reset()
 				} else if b == '\r' {
-					// Carriage return - might be clearing line or just CR
-					// Don't reset, just update current line
+					// Carriage return - reset line buffer (cursor back to start)
 					currentLineMu.Lock()
 					currentLine = stripAnsi(lineBuf.String())
 					currentLineMu.Unlock()
+					lineBuf.Reset()
 				} else {
 					lineBuf.WriteByte(b)
 				}
