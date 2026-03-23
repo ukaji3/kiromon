@@ -146,6 +146,7 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	go func() {
 		buf := make([]byte, 4096)
 		lineBuf := strings.Builder{}
+		pendingCR := false
 
 		for {
 			n, err := ptmx.Read(buf)
@@ -170,13 +171,19 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 						addLine(line)
 					}
 					lineBuf.Reset()
+					pendingCR = false
 				} else if b == '\r' {
-					// Carriage return - reset line buffer (cursor back to start)
+					// Save current line but defer reset until we see next char
 					currentLineMu.Lock()
 					currentLine = stripAnsi(lineBuf.String())
 					currentLineMu.Unlock()
-					lineBuf.Reset()
+					pendingCR = true
 				} else {
+					if pendingCR {
+						// \r not followed by \n: standalone CR, reset buffer
+						lineBuf.Reset()
+						pendingCR = false
+					}
 					lineBuf.WriteByte(b)
 				}
 			}
