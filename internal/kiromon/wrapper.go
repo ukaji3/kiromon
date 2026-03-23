@@ -174,9 +174,12 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 					pendingCR = false
 				} else if b == '\r' {
 					// Save current line but defer reset until we see next char
-					currentLineMu.Lock()
-					currentLine = stripAnsi(lineBuf.String())
-					currentLineMu.Unlock()
+					stripped := stripAnsi(lineBuf.String())
+					if stripped != "" {
+						currentLineMu.Lock()
+						currentLine = stripped
+						currentLineMu.Unlock()
+					}
 					pendingCR = true
 				} else {
 					if pendingCR {
@@ -192,9 +195,12 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 			if pendingCR {
 				// CR was the last thing received; currentLine already set in CR handler
 			} else {
-				currentLineMu.Lock()
-				currentLine = stripAnsi(lineBuf.String())
-				currentLineMu.Unlock()
+				stripped := stripAnsi(lineBuf.String())
+				if stripped != "" {
+					currentLineMu.Lock()
+					currentLine = stripped
+					currentLineMu.Unlock()
+				}
 			}
 		}
 	}()
