@@ -189,9 +189,13 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 			}
 
 			// Always update current line after processing buffer
-			currentLineMu.Lock()
-			currentLine = stripAnsi(lineBuf.String())
-			currentLineMu.Unlock()
+			if pendingCR {
+				// CR was the last thing received; currentLine already set in CR handler
+			} else {
+				currentLineMu.Lock()
+				currentLine = stripAnsi(lineBuf.String())
+				currentLineMu.Unlock()
+			}
 		}
 	}()
 
