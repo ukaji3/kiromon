@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -30,7 +29,7 @@ var (
 	activityMu       sync.RWMutex
 	currentLine      string
 	currentLineMu    sync.RWMutex
-	promptPatterns   []*regexp.Regexp
+
 	processStartTime time.Time
 )
 
@@ -42,17 +41,11 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	// Apply preset from config if standalone is nil (bare wrapper mode)
 	if standalone == nil {
 		if preset := getPreset(name); preset != nil {
-			if preset.Command != "" || preset.StartMsg != "" || preset.EndMsg != "" || preset.PromptPattern != "" {
+			if preset.Command != "" || preset.StartMsg != "" || preset.EndMsg != "" {
 				standalone = &StandaloneConfig{
 					Command:  preset.Command,
 					StartMsg: preset.StartMsg,
 					EndMsg:   preset.EndMsg,
-				}
-				// Apply prompt pattern from preset
-				if preset.PromptPattern != "" {
-					if re, err := regexp.Compile(preset.PromptPattern); err == nil {
-						standalone.PromptPattern = re
-					}
 				}
 				// Apply default_command if preset has no command
 				if standalone.Command == "" {
@@ -209,7 +202,10 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	var lastState string
 	var lastNotifiedState string
 	var stateChangeTime time.Time
+	var prevLine string
+	var lineStableSince time.Time
 	debounceDelay := time.Duration(DebounceDelay) * time.Second
+	idleThreshold := 1 * time.Second
 
 	go func() {
 		ticker := time.NewTicker(time.Duration(StatusInterval) * time.Millisecond)
@@ -220,18 +216,19 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 			line := currentLine
 			currentLineMu.RUnlock()
 
-			// Check if current line matches prompt pattern
-			var customPattern *regexp.Regexp
-			if standalone != nil {
-				customPattern = standalone.PromptPattern
+			// Detect state by line stability: unchanged for 1s = waiting
+			now := time.Now()
+			if line != prevLine {
+				prevLine = line
+				lineStableSince = now
 			}
-			promptMatched := matchPrompt(line, customPattern, promptPatterns)
+			lineIdle := line != "" && now.Sub(lineStableSince) >= idleThreshold
 
 			state := StateRunning
-			if promptMatched {
+			if lineIdle {
 				state = StateWaiting
 			}
-			updateStatus(state, strings.Join(args, " "), cmd.Process.Pid, line, promptMatched)
+			updateStatus(state, strings.Join(args, " "), cmd.Process.Pid, line, lineIdle)
 
 			// Standalone mode: check for state changes and notify with debounce
 			if standalone != nil {

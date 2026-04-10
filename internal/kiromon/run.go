@@ -19,9 +19,6 @@ func Run() int {
 		return 0
 	}
 
-	// Initialize default prompt patterns
-	promptPatterns = compilePromptPatterns(DefaultPromptPatterns)
-
 	// Check mode: wrapper or status checker
 	if len(os.Args) >= 2 && os.Args[1] == "-s" {
 		showStatus()

@@ -122,7 +122,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  kiromon -init                     - Create default config file")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Standalone mode (run + monitor in one process):")
-	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-ms <msg>] [-me <msg>] [-r <regex>] [-log <path>] [-min-duration <dur>] [--] <command> [args...]")
+	fmt.Fprintln(os.Stderr, "  kiromon -c <cmd> [-ms <msg>] [-me <msg>] [-log <path>] [-min-duration <dur>] [--] <command> [args...]")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Options:")
 	fmt.Fprintln(os.Stderr, "  -ms <msg>          Message for task start (running state)")
@@ -150,7 +150,6 @@ func runStandalone() {
 	command := ""
 	startMsg := ""
 	endMsg := ""
-	promptPattern := ""
 	logPath := ""
 	var minDuration time.Duration
 	var cmdArgs []string
@@ -186,14 +185,6 @@ func runStandalone() {
 				endMsg = args[i]
 			} else {
 				fmt.Fprintln(os.Stderr, "Error: -me requires a message")
-				os.Exit(1)
-			}
-		case "-r":
-			if i+1 < len(args) {
-				i++
-				promptPattern = args[i]
-			} else {
-				fmt.Fprintln(os.Stderr, "Error: -r requires a regex pattern")
 				os.Exit(1)
 			}
 		case "-log":
@@ -275,21 +266,10 @@ func runStandalone() {
 		}
 	}
 
-	var promptRe *regexp.Regexp
-	if promptPattern != "" {
-		var err error
-		promptRe, err = regexp.Compile(promptPattern)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Invalid regex pattern: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
 	config := &StandaloneConfig{
 		Command:       command,
 		StartMsg:      startMsg,
 		EndMsg:        endMsg,
-		PromptPattern: promptRe,
 		LogFile:       logFile,
 		Syslog:        syslogWriter,
 		MinDuration:   minDuration,

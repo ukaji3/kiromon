@@ -5,7 +5,6 @@ import (
 	"log/syslog"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sync"
 	"time"
 
@@ -37,7 +36,6 @@ type StandaloneConfig struct {
 	Command       string
 	StartMsg      string
 	EndMsg        string
-	PromptPattern *regexp.Regexp
 	LogFile       *os.File
 	Syslog        *syslog.Writer
 	LogMu         sync.Mutex
