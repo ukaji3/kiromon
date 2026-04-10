@@ -29,7 +29,8 @@ var (
 	activityMu       sync.RWMutex
 	currentLine      string
 	currentLineMu    sync.RWMutex
-
+	lastStdinInput   time.Time
+	stdinMu          sync.RWMutex
 	processStartTime time.Time
 )
 
@@ -128,6 +129,9 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 				activityMu.Lock()
 				lastActivity = time.Now()
 				activityMu.Unlock()
+				stdinMu.Lock()
+				lastStdinInput = time.Now()
+				stdinMu.Unlock()
 				if _, err := ptmx.Write(buf[:n]); err != nil {
 					return // PTY closed
 				}
@@ -154,6 +158,14 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 			activityMu.Lock()
 			lastActivity = time.Now()
 			activityMu.Unlock()
+
+			// Skip currentLine update if stdin input was recent (echo suppression)
+			stdinMu.RLock()
+			stdinRecent := !lastStdinInput.IsZero() && time.Since(lastStdinInput) < 500*time.Millisecond
+			stdinMu.RUnlock()
+			if stdinRecent {
+				continue
+			}
 
 			// Process for line buffer (strip ANSI for storage)
 			for i := 0; i < n; i++ {
