@@ -26,11 +26,6 @@ const (
 	DefaultPollInterval = 2.0 // seconds
 )
 
-// Default prompt patterns for detecting input-waiting state
-var DefaultPromptPatterns = []string{
-	`!> `, // kiro-cli prompt contains "!> "
-}
-
 // StandaloneConfig holds configuration for standalone mode
 type StandaloneConfig struct {
 	Command       string
@@ -46,10 +41,9 @@ type StandaloneConfig struct {
 
 // PresetConfig holds preset configuration for a specific command
 type PresetConfig struct {
-	Command       string `yaml:"command"`
-	PromptPattern string `yaml:"prompt_pattern"`
-	StartMsg      string `yaml:"start_msg"`
-	EndMsg        string `yaml:"end_msg"`
+	Command  string `yaml:"command"`
+	StartMsg string `yaml:"start_msg"`
+	EndMsg   string `yaml:"end_msg"`
 }
 
 // FileConfig represents the configuration file structure

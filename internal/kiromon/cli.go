@@ -609,7 +609,7 @@ func printStatus(name string, status *Status) {
 	fmt.Printf("Command: %s\n", status.Command)
 	fmt.Printf("PID: %d\n", status.PID)
 	fmt.Printf("Current line: %q\n", status.LastLine)
-	fmt.Printf("Prompt matched: %v\n", status.PromptMatched)
+	fmt.Printf("Idle detected: %v\n", status.IdleDetected)
 	fmt.Printf("Idle: %.1f seconds\n", status.IdleSeconds)
 	fmt.Printf("Updated: %s\n", status.UpdatedAt.Format("15:04:05"))
 	fmt.Println()

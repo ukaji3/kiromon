@@ -356,7 +356,7 @@ func addLine(line string) {
 }
 
 // updateStatus writes the current status to the status file
-func updateStatus(state, command string, pid int, lastLine string, promptMatched bool) {
+func updateStatus(state, command string, pid int, lastLine string, idleDetected bool) {
 	bufferMu.RLock()
 	lines := make([]string, len(screenBuffer))
 	copy(lines, screenBuffer)
@@ -379,7 +379,7 @@ func updateStatus(state, command string, pid int, lastLine string, promptMatched
 		UpdatedAt:     time.Now(),
 		LastLines:     lines,
 		LastLine:      lastLine,
-		PromptMatched: promptMatched,
+		IdleDetected:  idleDetected,
 		IdleSeconds:   idle,
 	}
 

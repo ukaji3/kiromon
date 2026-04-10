@@ -65,7 +65,7 @@ func TestReadStatusWithLock(t *testing.T) {
 			"command": "test-cmd",
 			"pid": 12345,
 			"last_line": "> ",
-			"prompt_matched": true,
+			"idle_detected": true,
 			"idle_seconds": 1.5
 		}`
 		os.WriteFile(filename, []byte(statusJSON), 0644)
@@ -81,8 +81,8 @@ func TestReadStatusWithLock(t *testing.T) {
 		if status.PID != 12345 {
 			t.Errorf("PID = %d, want %d", status.PID, 12345)
 		}
-		if !status.PromptMatched {
-			t.Error("PromptMatched = false, want true")
+		if !status.IdleDetected {
+			t.Error("IdleDetected = false, want true")
 		}
 	})
 
@@ -116,7 +116,7 @@ func TestStatusRoundTrip(t *testing.T) {
 		UpdatedAt:     time.Now().Truncate(time.Second),
 		LastLines:     []string{"line1", "line2"},
 		LastLine:      "> ",
-		PromptMatched: true,
+		IdleDetected:  true,
 		IdleSeconds:   2.5,
 	}
 

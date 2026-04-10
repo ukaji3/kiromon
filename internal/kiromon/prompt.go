@@ -20,48 +20,13 @@ func stripAnsi(s string) string {
 	return strings.TrimSpace(result.String())
 }
 
-// matchPrompt checks if the line matches any prompt pattern
-func matchPrompt(line string, customPattern *regexp.Regexp, defaultPatterns []*regexp.Regexp) bool {
-	// Check custom pattern first
-	if customPattern != nil {
-		if customPattern.MatchString(line) {
-			return true
-		}
-	}
-
-	// Check default patterns
-	for _, re := range defaultPatterns {
-		if re.MatchString(line) {
-			return true
-		}
-	}
-
-	// Also check if line ends with "> " or ">"
-	if strings.HasSuffix(line, "> ") || strings.HasSuffix(line, ">") {
-		return true
-	}
-
-	return false
-}
-
-// compilePromptPatterns compiles string patterns into regexp
-func compilePromptPatterns(patterns []string) []*regexp.Regexp {
-	var compiled []*regexp.Regexp
-	for _, p := range patterns {
-		if re, err := regexp.Compile(p); err == nil {
-			compiled = append(compiled, re)
-		}
-	}
-	return compiled
-}
-
 // runningKeywords are lines that indicate active processing
 var runningKeywords = []string{"Thinking...", "Running...", "Read", "Write", "Shell"}
 
-// isRunningLine returns true if the line matches a known active-processing pattern
+// isRunningLine returns true if the line contains a known active-processing keyword
 func isRunningLine(line string) bool {
 	for _, kw := range runningKeywords {
-		if line == kw {
+		if strings.Contains(line, kw) {
 			return true
 		}
 	}

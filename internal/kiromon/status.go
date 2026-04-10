@@ -20,7 +20,7 @@ type Status struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 	LastLines     []string  `json:"last_lines"`
 	LastLine      string    `json:"last_line"`
-	PromptMatched bool      `json:"prompt_matched"`
+	IdleDetected  bool      `json:"idle_detected"`
 	IdleSeconds   float64   `json:"idle_seconds"`
 }
 
