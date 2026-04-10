@@ -113,7 +113,6 @@ const defaultConfigContent = `# kiromon 設定ファイル
 # presets:
 #   kiro-cli:
 #     command: voicevox-speak-standalone
-#     prompt_pattern: '!> '
 #     start_msg: "{time}、タスクを開始したのだ"
 #     end_msg: "{time}、タスクを終了したのだ。処理時間は、{duration}だったのだ。"
 `
