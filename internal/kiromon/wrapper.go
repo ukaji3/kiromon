@@ -224,6 +224,11 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 			}
 			lineIdle := line != "" && now.Sub(lineStableSince) >= idleThreshold
 
+			// Certain lines indicate active processing regardless of idle time
+			if lineIdle && isRunningLine(line) {
+				lineIdle = false
+			}
+
 			state := StateRunning
 			if lineIdle {
 				state = StateWaiting

@@ -54,3 +54,16 @@ func compilePromptPatterns(patterns []string) []*regexp.Regexp {
 	}
 	return compiled
 }
+
+// runningKeywords are lines that indicate active processing
+var runningKeywords = []string{"Thinking...", "Read", "Write", "Shell"}
+
+// isRunningLine returns true if the line matches a known active-processing pattern
+func isRunningLine(line string) bool {
+	for _, kw := range runningKeywords {
+		if line == kw {
+			return true
+		}
+	}
+	return false
+}
