@@ -21,7 +21,7 @@ func stripAnsi(s string) string {
 }
 
 // runningKeywords are lines that indicate active processing
-var runningKeywords = []string{"Thinking...", "Running...", "Read", "Write", "Shell"}
+var runningKeywords = []string{"Thinking...", "Running...", "Read", "Write", "Shell", "Task"}
 
 // isRunningLine returns true if the line contains a known active-processing keyword
 func isRunningLine(line string) bool {
