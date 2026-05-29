@@ -31,6 +31,8 @@ var (
 	currentLineMu    sync.RWMutex
 	lastStdinInput   time.Time
 	stdinMu          sync.RWMutex
+	lastPromptSeen   time.Time
+	promptSeenMu     sync.RWMutex
 	processStartTime time.Time
 )
 
@@ -184,6 +186,7 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 						currentLineMu.Lock()
 						currentLine = stripped
 						currentLineMu.Unlock()
+						notePromptMarker(stripped)
 					}
 					pendingCR = true
 				} else {
@@ -205,6 +208,7 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 					currentLineMu.Lock()
 					currentLine = stripped
 					currentLineMu.Unlock()
+					notePromptMarker(stripped)
 				}
 			}
 		}
@@ -239,6 +243,18 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 			// Certain lines indicate active processing regardless of idle time
 			if lineIdle && isRunningLine(line) {
 				lineIdle = false
+			}
+
+			// Genuine waiting requires the input prompt marker to have appeared
+			// around the time output became stable. A stale marker (from a previous
+			// turn) means output froze due to long LLM thinking, not input waiting.
+			if lineIdle {
+				promptSeenMu.RLock()
+				ps := lastPromptSeen
+				promptSeenMu.RUnlock()
+				if ps.IsZero() || lineStableSince.Sub(ps) > 2*time.Second {
+					lineIdle = false
+				}
 			}
 
 			state := StateRunning
@@ -358,12 +374,23 @@ func addLine(line string) {
 		return
 	}
 
+	notePromptMarker(line)
+
 	bufferMu.Lock()
 	defer bufferMu.Unlock()
 
 	screenBuffer = append(screenBuffer, line)
 	if len(screenBuffer) > MaxLines {
 		screenBuffer = screenBuffer[len(screenBuffer)-MaxLines:]
+	}
+}
+
+// notePromptMarker records the time when the input-waiting prompt marker is seen
+func notePromptMarker(line string) {
+	if isPromptLine(line) {
+		promptSeenMu.Lock()
+		lastPromptSeen = time.Now()
+		promptSeenMu.Unlock()
 	}
 }
 

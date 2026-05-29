@@ -32,3 +32,11 @@ func isRunningLine(line string) bool {
 	}
 	return false
 }
+
+// promptMarker is the text shown in kiro-cli's input box when waiting for user input
+const promptMarker = "ask a question or describe a task"
+
+// isPromptLine returns true if the line contains the input-waiting prompt marker
+func isPromptLine(line string) bool {
+	return strings.Contains(strings.ToLower(line), promptMarker)
+}
