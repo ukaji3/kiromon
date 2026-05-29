@@ -32,6 +32,7 @@ var (
 	lastStdinInput   time.Time
 	stdinMu          sync.RWMutex
 	lastPromptSeen   time.Time
+	lastWorkingSeen  time.Time
 	promptSeenMu     sync.RWMutex
 	processStartTime time.Time
 )
@@ -245,14 +246,15 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 				lineIdle = false
 			}
 
-			// Genuine waiting requires the input prompt marker to have appeared
-			// around the time output became stable. A stale marker (from a previous
-			// turn) means output froze due to long LLM thinking, not input waiting.
+			// Genuine waiting requires the input prompt marker to be the most
+			// recent TUI signal. If "Kiro is working" appeared more recently,
+			// output froze due to long LLM thinking, not input waiting.
+			// Tools that emit neither marker fall back to pure idle detection.
 			if lineIdle {
 				promptSeenMu.RLock()
-				ps := lastPromptSeen
+				ps, ws := lastPromptSeen, lastWorkingSeen
 				promptSeenMu.RUnlock()
-				if ps.IsZero() || lineStableSince.Sub(ps) > 2*time.Second {
+				if (!ps.IsZero() || !ws.IsZero()) && ws.After(ps) {
 					lineIdle = false
 				}
 			}
@@ -385,11 +387,16 @@ func addLine(line string) {
 	}
 }
 
-// notePromptMarker records the time when the input-waiting prompt marker is seen
+// notePromptMarker records the time when the input-waiting or working marker is seen
 func notePromptMarker(line string) {
+	now := time.Now()
 	if isPromptLine(line) {
 		promptSeenMu.Lock()
-		lastPromptSeen = time.Now()
+		lastPromptSeen = now
+		promptSeenMu.Unlock()
+	} else if isWorkingLine(line) {
+		promptSeenMu.Lock()
+		lastWorkingSeen = now
 		promptSeenMu.Unlock()
 	}
 }
