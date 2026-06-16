@@ -222,7 +222,6 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	var lineStableSince time.Time
 	debounceDelay := time.Duration(DebounceDelay) * time.Second
 	idleThreshold := 1 * time.Second
-	markerFreshness := 2 * time.Second
 
 	go func() {
 		ticker := time.NewTicker(time.Duration(StatusInterval) * time.Millisecond)
@@ -246,15 +245,17 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 				lineIdle = false
 			}
 
-			// Genuine waiting requires the input prompt marker to be fresh,
-			// i.e., part of the currently-stable screen. A stale marker (from a
-			// previous turn) means output froze mid-processing, not input waiting.
-			// Tools that never emit the marker fall back to pure idle detection.
+			// Genuine waiting requires the input prompt box to be currently
+			// displayed: the marker must appear within the last few screen lines.
+			// During processing the marker scrolls out, so idle output mid-task
+			// (e.g. long thinking, or a persistent bottom hint line) is correctly
+			// treated as running. Tools that never emit the marker fall back to
+			// pure idle detection.
 			if lineIdle {
 				promptSeenMu.RLock()
-				ps := lastPromptSeen
+				markerEverSeen := !lastPromptSeen.IsZero()
 				promptSeenMu.RUnlock()
-				if !ps.IsZero() && lineStableSince.Sub(ps) > markerFreshness {
+				if markerEverSeen && !promptInRecentLines(promptScanLines) {
 					lineIdle = false
 				}
 			}
@@ -394,6 +395,27 @@ func notePromptMarker(line string) {
 		lastPromptSeen = time.Now()
 		promptSeenMu.Unlock()
 	}
+}
+
+// promptScanLines is how many trailing screen-buffer lines are scanned for the
+// input prompt marker when deciding the waiting state.
+const promptScanLines = 3
+
+// promptInRecentLines reports whether the input prompt marker appears within the
+// last n lines of the screen buffer (i.e., the input box is currently displayed).
+func promptInRecentLines(n int) bool {
+	bufferMu.RLock()
+	defer bufferMu.RUnlock()
+	start := len(screenBuffer) - n
+	if start < 0 {
+		start = 0
+	}
+	for _, l := range screenBuffer[start:] {
+		if isPromptLine(l) {
+			return true
+		}
+	}
+	return false
 }
 
 // updateStatus writes the current status to the status file
