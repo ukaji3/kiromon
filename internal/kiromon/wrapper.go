@@ -32,7 +32,6 @@ var (
 	lastStdinInput   time.Time
 	stdinMu          sync.RWMutex
 	lastPromptSeen   time.Time
-	lastWorkingSeen  time.Time
 	promptSeenMu     sync.RWMutex
 	processStartTime time.Time
 )
@@ -223,6 +222,7 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	var lineStableSince time.Time
 	debounceDelay := time.Duration(DebounceDelay) * time.Second
 	idleThreshold := 1 * time.Second
+	markerFreshness := 2 * time.Second
 
 	go func() {
 		ticker := time.NewTicker(time.Duration(StatusInterval) * time.Millisecond)
@@ -246,15 +246,15 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 				lineIdle = false
 			}
 
-			// Genuine waiting requires the input prompt marker to be the most
-			// recent TUI signal. If "Kiro is working" appeared more recently,
-			// output froze due to long LLM thinking, not input waiting.
-			// Tools that emit neither marker fall back to pure idle detection.
+			// Genuine waiting requires the input prompt marker to be fresh,
+			// i.e., part of the currently-stable screen. A stale marker (from a
+			// previous turn) means output froze mid-processing, not input waiting.
+			// Tools that never emit the marker fall back to pure idle detection.
 			if lineIdle {
 				promptSeenMu.RLock()
-				ps, ws := lastPromptSeen, lastWorkingSeen
+				ps := lastPromptSeen
 				promptSeenMu.RUnlock()
-				if (!ps.IsZero() || !ws.IsZero()) && ws.After(ps) {
+				if !ps.IsZero() && lineStableSince.Sub(ps) > markerFreshness {
 					lineIdle = false
 				}
 			}
@@ -387,16 +387,11 @@ func addLine(line string) {
 	}
 }
 
-// notePromptMarker records the time when the input-waiting or working marker is seen
+// notePromptMarker records the time when the input-waiting prompt marker is seen
 func notePromptMarker(line string) {
-	now := time.Now()
 	if isPromptLine(line) {
 		promptSeenMu.Lock()
-		lastPromptSeen = now
-		promptSeenMu.Unlock()
-	} else if isWorkingLine(line) {
-		promptSeenMu.Lock()
-		lastWorkingSeen = now
+		lastPromptSeen = time.Now()
 		promptSeenMu.Unlock()
 	}
 }
