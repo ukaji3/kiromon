@@ -26,6 +26,7 @@ var (
 	screenBuffer     []string
 	bufferMu         sync.RWMutex
 	lastActivity     time.Time
+	lastOutput       time.Time
 	activityMu       sync.RWMutex
 	currentLine      string
 	currentLineMu    sync.RWMutex
@@ -169,6 +170,12 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 				continue
 			}
 
+			// Genuine process output (not user-input echo): mark output activity.
+			// Used by the status updater to detect output-idle (waiting) state.
+			activityMu.Lock()
+			lastOutput = time.Now()
+			activityMu.Unlock()
+
 			// Process for line buffer (strip ANSI for storage)
 			for i := 0; i < n; i++ {
 				b := buf[i]
@@ -218,8 +225,6 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 	var lastState string
 	var lastNotifiedState string
 	var stateChangeTime time.Time
-	var prevLine string
-	var lineStableSince time.Time
 	debounceDelay := time.Duration(DebounceDelay) * time.Second
 	idleThreshold := 1 * time.Second
 
@@ -232,13 +237,14 @@ func runWrapper(args []string, standalone *StandaloneConfig) {
 			line := currentLine
 			currentLineMu.RUnlock()
 
-			// Detect state by line stability: unchanged for 1s = waiting
+			// Detect state by output activity: no process output for 1s = idle.
+			// Byte-based (not currentLine string) so animated redraws (spinner,
+			// streaming) count as running, and a stuck last line does not.
 			now := time.Now()
-			if line != prevLine {
-				prevLine = line
-				lineStableSince = now
-			}
-			lineIdle := line != "" && now.Sub(lineStableSince) >= idleThreshold
+			activityMu.RLock()
+			lo := lastOutput
+			activityMu.RUnlock()
+			lineIdle := !lo.IsZero() && now.Sub(lo) >= idleThreshold
 
 			// Certain lines indicate active processing regardless of idle time
 			if lineIdle && isRunningLine(line) {
